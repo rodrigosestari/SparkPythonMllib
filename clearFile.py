@@ -5,8 +5,9 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import StructField,StringType,LongType
+from pyspark.sql.types import StructField,StringType,IntegerType,DateType
 from pyspark.sql import SQLContext
+from datetime import date
 import os
 import time
 
@@ -35,21 +36,27 @@ if __name__ == "__main__":
     #function to get the position through the cell
     def getLocation(cellPosition):
         return cellPosition.strip('"').encode('utf-8')
+    
+    
+     #function to get the position through the cell
+    def getData():
+        return date.fromordinal(730920).strftime("%d/%m/%Y").encode('utf-8')
  
   
     
     #get the important fields
-    resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1).map(lambda row: (long(row[1]), getCategory(row[4]) ,getLocation(row[5]),long(row[9]) )).repartition(1)
+    resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1).map(lambda row: (int(row[1]), getCategory(row[4]) ,getLocation(row[5]),int(row[9]), getData())).repartition(1)
     
     #sql save
-    schemaCSV ='_id;_url;_5;sequenceId'
+    schemaCSV ='_id;_url;_5;sequenceId;data'
     fields = [StructField(field_name, StringType(), True) for field_name in schemaCSV.split(';')]
-    fields[0].dataType = LongType()
-    fields[3].dataType = LongType()
+    fields[0].dataType = IntegerType()
+    fields[3].dataType = IntegerType()
+    fields[4].dataType = DateType()
 
 
-    #schemaDataFrame= sqlContext.createDataFrame(resultMap, fields)
-    ##data = sqlContext.read.format("libsvm").save("result"+str(time.time()))
+   # schemaDataFrame= sqlContext.createDataFrame(resultMap, fields)
+   # data = sqlContext.read.format("libsvm").save("result"+str(time.time()))
     
     #normal save
     resultMap.saveAsTextFile("result"+str(time.time()))
