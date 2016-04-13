@@ -5,7 +5,7 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import IntegerType,StructField,StructType,StringType
+from pyspark.sql.types import IntegerType,StructField,StructType,StringType,ArrayType,DateType
 from pyspark.sql import SQLContext
 from datetime import date
 import os
@@ -32,7 +32,7 @@ if __name__ == "__main__":
     #function to get the categories through URL
     def getCategory(requestHttp):        
         #return requestHttp.strip('"').encode('utf-8')
-        key =  ["news","sport"]
+        key =  ["trenitalia","it",["news","sport"]]
         return key
         
     #function to get the position through the cell
@@ -41,19 +41,21 @@ if __name__ == "__main__":
     
     
     #function to get the position through the cell
-    def getData():
-        return date.fromordinal(730920).strftime("%d/%m/%Y").encode('utf-8')
+    def getData(datep):
+        return date.fromordinal(datep)
+    #strftime("%d/%m/%Y").encode('utf-8')
  
   
     
     #get the important fields
-    resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1).map(lambda row: (int(row[1]), getCategory(row[4]) ,getLocation(row[5]),int(row[9]), getData())).repartition(1)
+    resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1).map(lambda row: (int(row[1]), getCategory(row[4]),int(1),getLocation(row[5]),int(row[9]), getData(730920))).repartition(1)
     
       
 
     #put on Json
-    fields = StructType([StructField("id", IntegerType(), True),StructField("url", StringType(), True),StructField("5", StringType(), True), \
-                         StructField("sequenceId", IntegerType(), True),StructField("data", StringType(), True)])
+    fields = StructType([StructField("requestId", IntegerType(), True),  \
+            StructField("url", StructType([StructField("name", StringType(), False),StructField("domain", StringType(), True),  StructField("categories", ArrayType(StringType(), True), True)]), False), \
+            StructField("kind", IntegerType(), True),StructField("location", StringType(), True),  StructField("sequenceId", IntegerType(), True),StructField("data", DateType(), True)])
     schemaDataFrame= sqlContext.applySchema(resultMap, fields)
     data = schemaDataFrame.toJSON()
     data.saveAsTextFile("result"+str(time.time()))

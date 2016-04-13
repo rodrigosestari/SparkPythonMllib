@@ -5,8 +5,9 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import StructField,StringType,IntegerType,StructType
-from pyspark.sql import SQLContext
+from pyspark.sql import *
+
+
 import os
 
 
@@ -24,13 +25,9 @@ if __name__ == "__main__":
 
     sc = SparkContext(conf=conf)     
     sqlContext = SQLContext(sc)
-
-    logSplited = sc.textFile("result1460566199.47/part-00000").cache()
-   
-    fields = StructType([StructField("id", IntegerType(), True),StructField("url", StringType(), True),StructField("5", StringType(), True), \
-                         StructField("sequenceId", IntegerType(), True),StructField("data", StringType(), True)])
     
-    schemaDataFrame= sqlContext.applySchema(logSplited, fields)
+    dfRequest = sqlContext.read.json("result1460579896.47/part-00000")
+    dfRequest.registerTempTable("requets")
   
     
     #function to get the categories through URL
@@ -41,12 +38,12 @@ if __name__ == "__main__":
     def getLocation(cellPosition):
         return ""
  
+    results = sqlContext.sql("SELECT * FROM requets")
 
+    names = results.map(lambda p: "location: " + p.location)
+    for name in names.collect():
+        print(name)
     
-    
-    
-    
-   
-    
+
     sc.stop()
     
