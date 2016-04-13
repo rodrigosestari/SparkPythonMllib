@@ -5,7 +5,7 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import StructField,StringType,IntegerType,DateType
+from pyspark.sql.types import IntegerType,StructField,StructType,StringType
 from pyspark.sql import SQLContext
 from datetime import date
 import os
@@ -26,19 +26,21 @@ if __name__ == "__main__":
     sc = SparkContext(conf=conf)
     sqlContext = SQLContext(sc)
    
-    log = sc.textFile("logs/p.csv")  
+    log = sc.textFile("logs/p.csv").cache()
     
     
     #function to get the categories through URL
     def getCategory(requestHttp):        
-        return requestHttp.strip('"').encode('utf-8')
+        #return requestHttp.strip('"').encode('utf-8')
+        key =  ["news","sport"]
+        return key
         
     #function to get the position through the cell
     def getLocation(cellPosition):
         return cellPosition.strip('"').encode('utf-8')
     
     
-     #function to get the position through the cell
+    #function to get the position through the cell
     def getData():
         return date.fromordinal(730920).strftime("%d/%m/%Y").encode('utf-8')
  
@@ -47,25 +49,15 @@ if __name__ == "__main__":
     #get the important fields
     resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1).map(lambda row: (int(row[1]), getCategory(row[4]) ,getLocation(row[5]),int(row[9]), getData())).repartition(1)
     
-    #sql save
-    schemaCSV ='_id;_url;_5;sequenceId;data'
-    fields = [StructField(field_name, StringType(), True) for field_name in schemaCSV.split(';')]
-    fields[0].dataType = IntegerType()
-    fields[3].dataType = IntegerType()
-    fields[4].dataType = DateType()
+      
 
-
-   # schemaDataFrame= sqlContext.createDataFrame(resultMap, fields)
-   # data = sqlContext.read.format("libsvm").save("result"+str(time.time()))
+    #put on Json
+    fields = StructType([StructField("id", IntegerType(), True),StructField("url", StringType(), True),StructField("5", StringType(), True), \
+                         StructField("sequenceId", IntegerType(), True),StructField("data", StringType(), True)])
+    schemaDataFrame= sqlContext.applySchema(resultMap, fields)
+    data = schemaDataFrame.toJSON()
+    data.saveAsTextFile("result"+str(time.time()))
     
-    #normal save
-    resultMap.saveAsTextFile("result"+str(time.time()))
-    
-    #line.saveAsNewAPIHadoopFile("/test.txt", 'org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat' )
-
-   
-    
-    ## line =  log.flatMap(lambda line : line.split(";")).filter(lambda line: len(line)>1).map(lambda line: (line[0],line[1])).collect()
 
     sc.stop()
     

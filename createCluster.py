@@ -5,7 +5,7 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import StructField,StringType
+from pyspark.sql.types import StructField,StringType,IntegerType,StructType
 from pyspark.sql import SQLContext
 import os
 
@@ -25,9 +25,13 @@ if __name__ == "__main__":
     sc = SparkContext(conf=conf)     
     sqlContext = SQLContext(sc)
 
+    logSplited = sc.textFile("result1460566199.47/part-00000").cache()
    
-    logSplited = sc.textFile("result1460495650.17/part-00000")
-    data = sqlContext.read.format("libsvm").load("data/mllib/sample_libsvm_data.txt")  
+    fields = StructType([StructField("id", IntegerType(), True),StructField("url", StringType(), True),StructField("5", StringType(), True), \
+                         StructField("sequenceId", IntegerType(), True),StructField("data", StringType(), True)])
+    
+    schemaDataFrame= sqlContext.applySchema(logSplited, fields)
+  
     
     #function to get the categories through URL
     def getCategory(requestHttp):        
@@ -37,12 +41,7 @@ if __name__ == "__main__":
     def getLocation(cellPosition):
         return ""
  
-        
-    #create Data Frame with Spark SQL
-    schemaCSV ='Resquest;Url;6;sequenceId'
-    fields = [StructField(field_name, StringType(), True) for field_name in schemaCSV.split(';')]
-    schemaDataFrame= sqlContext.createDataFrame(logSplited, fields)
-    
+
     
     
     
