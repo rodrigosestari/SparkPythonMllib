@@ -29,15 +29,6 @@ if __name__ == "__main__":
     dfRequest = sqlContext.read.json("result1460579896.47/part-00000")
     dfRequest.registerTempTable("requets")
   
-    
-    #function to get the categories through URL
-    def getCategory(requestHttp):        
-        return requestHttp
-        
-    #function to get the position through the cell
-    def getLocation(cellPosition):
-        return ""
- 
     results = sqlContext.sql("SELECT * FROM requets")
 
     names = results.map(lambda p: "location: " + p.location)
