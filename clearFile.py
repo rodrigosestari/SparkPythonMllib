@@ -5,11 +5,12 @@ Created on Apr 12, 2016
 '''
 from __future__ import print_function
 from pyspark import SparkContext,SparkConf
-from pyspark.sql.types import IntegerType,StructField,StructType,StringType,ArrayType,DateType
+from pyspark.sql.types import IntegerType,StructField,StructType,StringType,ArrayType,TimestampType
 from pyspark.sql import SQLContext
-from datetime import date
-import os
+from dateutil.parser import parse
 import time
+import os
+import re
 
 
 
@@ -26,41 +27,114 @@ if __name__ == "__main__":
     sc = SparkContext(conf=conf)
     sqlContext = SQLContext(sc)
    
-    log = sc.textFile("logs/p.csv").cache()
+    log = sc.textFile("logs/new.csv").cache()
     
     
     #function to get the categories through URL
-    def getCategory(requestHttp):        
-        #return requestHttp.strip('"').encode('utf-8')
-        key =  ["trenitalia","it",["news","sport"]]
+    def getCategory(requestHttp):                
+        key =  [["trenitalia","it",["train","buy"]], ["gazzetta","it",["news","sport"]]]
         return key
         
-    #function to get the position through the cell
-    def getLocation(cellPosition):
-        return cellPosition.strip('"').encode('utf-8')
     
     
     #function to get the position through the cell
     def getData(datep):
-        return date.fromordinal(datep)
-    #strftime("%d/%m/%Y").encode('utf-8')
- 
+        return parse(datep)
+    
+
+
+
+    def regularExpressionFilter(url):
+        matchObj = re.search('ads.g', url)
+        match1bj = re.search('porn', url)
+        match2bj = re.search('XXL', url)
+        match3bj = re.search('.xvideo', url)        
+        match4bj = re.search('fuck', url)
+        match5bj = re.search('.jpg', url)
+
+        if matchObj or match1bj or match2bj or match3bj or match4bj or match5bj:
+            return False
+        else:
+            return True
+
+    def regularExpression(httprequest):
+        size =len(httprequest)    
+        if size > 1:
+           httprequest[0] =  httprequest[0][1:]
+           httprequest[size-1] = httprequest[size-1][:-1]
+        array = []
+        for item in httprequest:
+           if regularExpressionFilter(item):
+                array.append(item) 
+        return array
+       
   
     
     #get the important fields
     resultMap = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1). \
-                    map(lambda row: (int(row[1]), getCategory(row[4]),int(1),getLocation(row[5]), \
-                                     int(row[9]), getData())).repartition(1)
-    
-      
-
+                    map(lambda row: (str(row[0]), \
+                                     int(row[1]), \
+                                     int(row[2]), \
+                                     getData(row[3]), \
+                                     int(row[4]), \
+                                     str(row[5]), \
+                                     int(row[6]), \
+                                     int(row[7]), \
+                                     int(row[8]), \
+                                     int(row[9]), \
+                                     row[10]))
+                    
+    resultMap_FilterUlr =  resultMap.map(lambda (a,b,c,d,e,f,g,h,i,j,l): (a,b,c,d,e,f,g,h,i,j,regularExpression(l.split(",")))). \
+                                    filter(lambda (a,b,c,d,e,f,g,h,i,j,l): len(l) >1)
+     
     #put on Json
-    fields = StructType([StructField("requestId", IntegerType(), True),  \
-            StructField("url", StructType([StructField("name", StringType(), False),StructField("domain", StringType(), True), \
-                                            StructField("categories", ArrayType(StringType(), True), True)]), False), \
-            StructField("kind", IntegerType(), True),StructField("location", StringType(), True),  \
-            StructField("sequenceId", IntegerType(), True),StructField("data", DateType(), True)])
-    schemaDataFrame= sqlContext.applySchema(resultMap, fields)
+    fields = StructType( \
+                        [StructField("GSN", StringType(), False),  \
+                        StructField("ChargingID", IntegerType(), False),  \
+                        StructField("RecordSequence", IntegerType(), False),  \
+                        StructField("RecordOpeningDate", TimestampType(), False),  \
+                        StructField("rATType", IntegerType(), False),  \
+                        StructField("UserLocation", StringType(), False),  \
+                        StructField("Accuracy", IntegerType(), False),  \
+                        StructField("BrowsingSession", IntegerType(), False),  \
+                        StructField("Uplink", IntegerType(), False),  \
+                        StructField("Downlink", IntegerType(), False), \
+                        StructField("Urls", ArrayType(StringType(),False))])
+    
+     #The new Json Format
+    newStructure = StructType( \
+                        [StructField("GSN", StringType(), False),  \
+                        StructField("ChargingID", IntegerType(), False),  \
+                        StructField("RecordSequence", IntegerType(), False),  \
+                        StructField("RecordOpeningDate", TimestampType(), False),  \
+                        StructField("rATType", IntegerType(), False),  \
+                        StructField("UserLocation", StringType(), False),  \
+                        StructField("Accuracy", IntegerType(), False),  \
+                        StructField("BrowsingSession", IntegerType(), False),  \
+                        StructField("Uplink", IntegerType(), False),  \
+                        StructField("Downlink", IntegerType(), False), \
+                        StructField("Urls",ArrayType( \
+                                                     StructType([StructField("name", StringType(), False),StructField("domain", StringType(), True), \
+                                                                    StructField("categories", ArrayType(StringType(), True), True)]), False), \
+                                                True)])
+            
+        #get the important fields
+    resultMap_newFormat = log.map(lambda line: line.split(";")).filter(lambda line: len(line)>1). \
+                                 map(lambda row: (str(row[0]), \
+                                     int(row[1]), \
+                                     int(row[2]), \
+                                     getData(row[3]), \
+                                     int(row[4]), \
+                                     str(row[5]), \
+                                     int(row[6]), \
+                                     int(row[7]), \
+                                     int(row[8]), \
+                                     int(row[9]), \
+                                     getCategory(row[9])))
+                    
+     
+    schemaDataFrame= sqlContext.applySchema(resultMap_newFormat, newStructure)
+    #schemaDataFrame= sqlContext.applySchema(resultMap_FilterUlr, fields)
     data = schemaDataFrame.toJSON()
     data.saveAsTextFile("result"+str(time.time()))
     
